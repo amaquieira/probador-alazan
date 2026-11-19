@@ -1,4 +1,4 @@
-/*! Probador Alazán v0.1.1 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
+/*! Probador Alazán v0.1.2 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
 (function(w,d){"use strict";
 if(w.__PA_LOADED)return;w.__PA_LOADED=true;
 /* Motor del Probador Alazán · copia textual del prototipo aprobado (ver orig/engine_original.js).
@@ -41,7 +41,7 @@ function parse(v){v=String(v).trim().replace(",",".");if(v==="")return {e:"vacio
 return {evaluar:evaluar,siguienteMasHolgado:siguienteMasHolgado,parse:parse,fila:fila,idxTalle:idxTalle,FAMILIA:FAMILIA};
 }
 /* ===== Probador Alazán · interfaz e integración con la ficha de Tiendanube (tema Río) ===== */
-var VERSION="0.1.1";
+var VERSION="0.1.2";
 var DEFAULTS={
   enabled:true,
   calculo:true,                 /* false = solo guía (tabla + a medida por WhatsApp), sin cálculo de talle */
@@ -388,12 +388,16 @@ function prepWA(){var has=!!(S.cin&&S.cad&&S.res);$("#pa-chkwrap").style.display
   var custom=S.waMode!=="consulta";$("#pa-wafree").hidden=!custom;$("#pa-waneed").hidden=!custom;$("#pa-flar").hidden=!custom;
   $("#pa-h-wa").textContent=custom?"Tu pedido a medida":"Consultanos por WhatsApp";$("#pa-title").textContent=custom?"Pedido a medida":"WhatsApp";
   $("#pa-chktxt").textContent=has?("Sumar mis medidas al mensaje ("+medidasTxt()+")"):"";
-  $("#pa-chk").checked=S.consent;if(!S.msgEdited)$("#pa-msg").value=buildMsg();$("#pa-wabtn").href=whatsappUrl();$("#pa-waphone").href=whatsappUrl();}
+  $("#pa-chk").checked=S.consent;if(!S.msgEdited)$("#pa-msg").value=buildMsg();}
 function syncMsg(){if(!S.msgEdited)$("#pa-msg").value=buildMsg();
   else{var base=$("#pa-msg").value.replace(/\n\nMis medidas:.*$/,"");$("#pa-msg").value=base+(S.consent?"\n\nMis medidas: "+medidasTxt()+".":"");}
-  if(S.cin&&S.cad)$("#pa-chktxt").textContent="Sumar mis medidas al mensaje ("+medidasTxt()+")";
-  $("#pa-wabtn").href=whatsappUrl();$("#pa-waphone").href=whatsappUrl();}
-function onWaClick(){this.href=whatsappUrl();push("probador_whatsapp_click",{pa_modo:S.waMode,pa_con_medidas:!!S.consent,pa_largo:!!($("#pa-lar").value||"").trim()});}
+  if(S.cin&&S.cad)$("#pa-chktxt").textContent="Sumar mis medidas al mensaje ("+medidasTxt()+")";}
+/* El enlace visible queda siempre sin texto (wa.me/numero): así el clic automático de GTM (gtm.click / Click URL)
+   nunca copia el mensaje ni las medidas al dataLayer. El mensaje se arma recién al hacer clic y se abre aparte. */
+function onWaClick(e){if(e)e.preventDefault();var u=whatsappUrl();
+  push("probador_whatsapp_click",{pa_modo:S.waMode,pa_con_medidas:!!S.consent,pa_largo:!!($("#pa-lar").value||"").trim()});
+  var win=null;try{win=w.open(u,"_blank");}catch(x){}
+  if(win){try{win.opener=null;}catch(x){}}else{w.location.href=u;}}
 
 /* ===== Eventos ===== */
 function enlazar(){
@@ -403,7 +407,7 @@ function enlazar(){
   $("#pa-pick").addEventListener("click",elegirTalle);
   $("#pa-chk").addEventListener("change",function(){S.consent=this.checked;syncMsg();});
   $("#pa-lar").addEventListener("input",syncMsg);
-  $("#pa-msg").addEventListener("input",function(){S.msgEdited=true;$("#pa-wabtn").href=whatsappUrl();$("#pa-waphone").href=whatsappUrl();});
+  $("#pa-msg").addEventListener("input",function(){S.msgEdited=true;});
   $("#pa-wabtn").addEventListener("click",onWaClick);$("#pa-waphone").addEventListener("click",onWaClick);
   $("#pa-close").addEventListener("click",function(){close();});
   $("#pa-back").addEventListener("click",back);
