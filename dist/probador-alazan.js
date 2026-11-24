@@ -1,4 +1,4 @@
-/*! Probador Alazán v0.1.2 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
+/*! Probador Alazán v0.1.3 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
 (function(w,d){"use strict";
 if(w.__PA_LOADED)return;w.__PA_LOADED=true;
 /* Motor del Probador Alazán · copia textual del prototipo aprobado (ver orig/engine_original.js).
@@ -41,7 +41,7 @@ function parse(v){v=String(v).trim().replace(",",".");if(v==="")return {e:"vacio
 return {evaluar:evaluar,siguienteMasHolgado:siguienteMasHolgado,parse:parse,fila:fila,idxTalle:idxTalle,FAMILIA:FAMILIA};
 }
 /* ===== Probador Alazán · interfaz e integración con la ficha de Tiendanube (tema Río) ===== */
-var VERSION="0.1.2";
+var VERSION="0.1.3";
 var DEFAULTS={
   enabled:true,
   calculo:true,                 /* false = solo guía (tabla + a medida por WhatsApp), sin cálculo de talle */
@@ -192,7 +192,7 @@ function plantilla(){
    '<p class="pa-step-k">Paso 2 de 2</p>'+
    '<div id="pa-fit" class="pa-fit" hidden><h4 id="pa-fitq" tabindex="-1">¿Cómo te gusta usar tu pantalón?</h4><p class="pa-fit-intro">Encontramos dos talles posibles según tus medidas. Elegí cómo te gusta que te quede.</p>'+
     '<div class="pa-fit-grid" role="group" aria-label="Preferencia de calce">'+
-     '<button type="button" class="pa-fit-choice" data-fit="ajustado" aria-pressed="true"><b>Más ajustado</b><span>Prefiero que quede más al cuerpo.</span><small id="pa-fit-t"></small></button>'+
+     '<button type="button" class="pa-fit-choice" data-fit="ajustado" aria-pressed="false"><b>Más ajustado</b><span>Prefiero que quede más al cuerpo.</span><small id="pa-fit-t"></small></button>'+
      '<button type="button" class="pa-fit-choice" data-fit="holgado" aria-pressed="false"><b>Más holgado</b><span>Prefiero que quede más suelto.</span><small id="pa-fit-l"></small></button>'+
     '</div></div>'+
    '<span class="pa-badge">Resultado orientativo</span>'+
@@ -245,7 +245,7 @@ function plantilla(){
 }
 
 /* ===== Estado (se mantiene al cerrar y reabrir) ===== */
-var S={step:"welcome",hist:[],cin:"",cad:"",res:null,fit:"ajustado",consent:false,msgEdited:false,picked:null,waMode:"medida",origen:null};
+var S={step:"welcome",hist:[],cin:"",cad:"",res:null,fit:"",consent:false,msgEdited:false,picked:null,waMode:"medida",origen:null};
 var ROOT=null,TOAST=null,lastTrigger=null,isOpen=false;
 var TITLES={welcome:"Probador Alazán",table:"Tabla de talles",measure:"Probador Alazán",resA:"Probador Alazán",resB:"Probador Alazán",resC:"Probador Alazán",wa:"Pedido a medida"};
 
@@ -324,7 +324,7 @@ function onSubmit(ev){ev.preventDefault();
   if(errs.length){sum.textContent="Revisá "+(errs.length===2?"las dos medidas":"la medida de "+errs[0])+" para ver tu resultado.";sum.classList.add("pa-show");(a.e?$("#pa-cin"):$("#pa-cad")).focus();return;}
   sum.classList.remove("pa-show");
   calcularDisponibilidad();
-  S.cin=a.n;S.cad=b.n;S.res=evaluar(a.n,b.n);S.fit="ajustado";
+  S.cin=a.n;S.cad=b.n;S.res=evaluar(a.n,b.n);S.fit="" /* v0.1.3: sin preselección de calce */;
   if(S.res.tipo==="A"){S.res.baseTalle=S.res.talle;S.res.altTalle=siguienteMasHolgado(S.res.baseTalle,a.n,b.n);}
   S.consent=false;S.msgEdited=false;
   push("probador_submit");
@@ -337,6 +337,8 @@ function rng(a){return a[0]+"–"+a[1]+" cm";}
 function renderRes(){var r=S.res;if(!r)return;
   if(r.tipo==="A"){
     var options=$("#pa-fit");options.hidden=!r.altTalle;
+    /* v0.1.3: con dos talles posibles, la recomendación se muestra recién después de elegir el calce */
+    var secA=$('[data-step="resA"]');if(secA)secA.classList.toggle("pa-fit-pend",!!r.altTalle&&!S.fit);
     if(r.altTalle){$("#pa-fit-t").textContent="Talle "+r.baseTalle+" · "+dispLabel(r.baseTalle);$("#pa-fit-l").textContent="Talle "+r.altTalle+" · "+dispLabel(r.altTalle);
       $$("[data-fit]",options).forEach(function(b){b.setAttribute("aria-pressed",String(b.getAttribute("data-fit")===S.fit));});}
     var f=fila(r.talle);
@@ -346,7 +348,7 @@ function renderRes(){var r=S.res;if(!r)return;
     renderAvail(r.talle);
     var n=[];if(r.entreDos)n.push("Tu cintura corresponde al talle "+r.cin+" y tu cadera al "+r.cad+". Te sugerimos el más grande, como indica la guía de la ficha.");
     if(r.avisos&&r.avisos.length)n.push((r.avisos.length>1?"Tu cintura y tu cadera son menores que las del talle S":"Tu "+r.avisos[0]+" es menor que la del talle S")+": puede quedarte un poco más holgado. Si preferís, lo hacemos a tu medida, gratis.");
-    if(r.altTalle)n.push(S.fit==="holgado"?"Elegiste la opción más holgada de los dos talles compatibles.":"Elegiste la opción más ajustada de los dos talles compatibles.");
+    if(r.altTalle&&S.fit)n.push(S.fit==="holgado"?"Elegiste la opción más holgada de los dos talles compatibles.":"Elegiste la opción más ajustada de los dos talles compatibles.");
     var an=$("#pa-anote");an.textContent=n.join(" ");an.hidden=!n.length;
     /* En la tienda real no se puede elegir un talle sin stock: se oculta el botón y queda la opción a medida. */
     var dd=DISPONIBILIDAD[r.talle];$("#pa-pickwrap").hidden=(!dd||dd.estado==="agotado"||!P.grupo.anchors[r.talle]);
