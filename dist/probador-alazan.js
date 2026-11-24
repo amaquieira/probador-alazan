@@ -1,4 +1,4 @@
-/*! Probador Alazán v0.1.4 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
+/*! Probador Alazán v0.1.5 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
 (function(w,d){"use strict";
 if(w.__PA_LOADED)return;w.__PA_LOADED=true;
 /* Motor del Probador Alazán · copia textual del prototipo aprobado (ver orig/engine_original.js).
@@ -41,7 +41,7 @@ function parse(v){v=String(v).trim().replace(",",".");if(v==="")return {e:"vacio
 return {evaluar:evaluar,siguienteMasHolgado:siguienteMasHolgado,parse:parse,fila:fila,idxTalle:idxTalle,FAMILIA:FAMILIA};
 }
 /* ===== Probador Alazán · interfaz e integración con la ficha de Tiendanube (tema Río) ===== */
-var VERSION="0.1.4";
+var VERSION="0.1.5";
 var DEFAULTS={
   enabled:true,
   calculo:true,                 /* false = solo guía (tabla + a medida por WhatsApp), sin cálculo de talle */
@@ -371,14 +371,25 @@ function elegirTalle(){
   /* Nunca se marca ni se agrega una variante agotada o no comprable, aunque se fuerce el botón. */
   if(!a||!dd||dd.estado==="agotado"){push("probador_select_size",{pa_talle:t,pa_ok:false,pa_motivo:"no_disponible"});renderRes();return;}
   S.adding=true;var pk=$("#pa-pick");if(pk){pk.disabled=true;pk.setAttribute("aria-busy","true");}
-  S.picked=t;close();
-  var ok=false;
-  try{a.click();ok=true;}catch(e){}
-  setTimeout(function(){
-    var marcado=!!(a&&a.classList.contains("selected"));
-    push("probador_select_size",{pa_talle:t,pa_ok:marcado,pa_calce:S.res&&S.res.altTalle?S.fit:""});
-    agregarNativo(t,marcado);
-  },ok?120:0);
+  S.picked=t;
+  /* v0.1.5 · primero se cierra el probador y se espera a que termine el history.back() del cierre;
+     recién después se marca el talle y se usa el botón nativo. Así la navegación al carrito
+     nunca compite con la vuelta atrás del historial (causa del loop en el segundo uso). */
+  cerrarYLuego(function(){
+    var ok=false;
+    try{a.click();ok=true;}catch(e){}
+    setTimeout(function(){
+      var marcado=!!(a&&a.classList.contains("selected"));
+      push("probador_select_size",{pa_talle:t,pa_ok:marcado,pa_calce:S.res&&S.res.altTalle?S.fit:""});
+      agregarNativo(t,marcado);
+    },ok?120:0);
+  });
+}
+function cerrarYLuego(fn){
+  var propio=false;try{propio=!!(history.state&&history.state.pa);}catch(e){}
+  if(!isOpen||!propio){close();fn();return;}
+  var hecho=false,seguir=function(){if(hecho)return;hecho=true;w.removeEventListener("popstate",seguir);setTimeout(fn,30);};
+  w.addEventListener("popstate",seguir);close();setTimeout(seguir,800);
 }
 /* v0.1.4 · Agregado al carrito con el botón NATIVO de Tiendanube (un solo clic, una sola operación).
    El módulo no envía add_to_cart: el evento ecommerce lo genera Tiendanube como con cualquier compra. */
@@ -456,6 +467,7 @@ function enlazar(){
   });
   d.addEventListener("click",function(e){var o=e.target.closest&&e.target.closest("[data-pa-open]");if(o){e.preventDefault();open(o,o.getAttribute("data-pa-open"));}});
   w.addEventListener("popstate",function(){if(isOpen)close(true);});
+  w.addEventListener("pageshow",function(e){if(e&&e.persisted){liberarPick();if(TOAST)TOAST.classList.remove("pa-show");if(isOpen)close(true);}});
 }
 
 /* ===== Arranque ===== */
@@ -474,14 +486,15 @@ function iniciar(){
   d.body.appendChild(ROOT);d.body.appendChild(TOAST);
   enlazar();
   var accesos=[];
-  P.grupo.el.insertAdjacentElement("afterend",accSuperior());accesos.push("superior");
+  var ph=d.querySelector("[data-pa-ph]");
+  if(ph&&ph.parentNode){ph.parentNode.replaceChild(accSuperior(),ph);}else{P.grupo.el.insertAdjacentElement("afterend",accSuperior());}accesos.push("superior");
   var pi=puntoInferior();if(pi){pi.insertAdjacentElement("afterend",accInferior());accesos.push("inferior");}
   updateAccessLabels();
   push("probador_ready",{pa_accesos:accesos.join(",")});
   log("listo",VERSION,accesos,DISPONIBILIDAD);
   return {ok:true,accesos:accesos};
 }
-function quitar(){try{d.querySelectorAll("[data-pa-acc]").forEach(function(n){n.remove();});if(ROOT)ROOT.remove();if(TOAST)TOAST.remove();d.documentElement.classList.remove("pa-lock");}catch(e){}}
+function quitar(){try{d.querySelectorAll("[data-pa-acc],[data-pa-ph]").forEach(function(n){n.remove();});if(ROOT)ROOT.remove();if(TOAST)TOAST.remove();d.documentElement.classList.remove("pa-lock");}catch(e){}}
 
 var resultado={ok:false,motivo:"no_iniciado"};
 try{resultado=iniciar();}catch(e){quitar();resultado={ok:false,motivo:"error:"+(e&&e.message)};try{console.warn("[Probador Alazán] desactivado por error:",e);}catch(_){}}
