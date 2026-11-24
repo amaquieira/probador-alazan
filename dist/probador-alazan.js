@@ -1,4 +1,4 @@
-/*! Probador Alazán v0.1.3 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
+/*! Probador Alazán v0.1.4 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
 (function(w,d){"use strict";
 if(w.__PA_LOADED)return;w.__PA_LOADED=true;
 /* Motor del Probador Alazán · copia textual del prototipo aprobado (ver orig/engine_original.js).
@@ -41,7 +41,7 @@ function parse(v){v=String(v).trim().replace(",",".");if(v==="")return {e:"vacio
 return {evaluar:evaluar,siguienteMasHolgado:siguienteMasHolgado,parse:parse,fila:fila,idxTalle:idxTalle,FAMILIA:FAMILIA};
 }
 /* ===== Probador Alazán · interfaz e integración con la ficha de Tiendanube (tema Río) ===== */
-var VERSION="0.1.3";
+var VERSION="0.1.4";
 var DEFAULTS={
   enabled:true,
   calculo:true,                 /* false = solo guía (tabla + a medida por WhatsApp), sin cálculo de talle */
@@ -199,7 +199,7 @@ function plantilla(){
    '<h3 id="pa-h-a" class="pa-res-big pa-size-result" aria-live="polite"><span class="pa-result-label">Talle orientativo</span><span class="pa-t" id="pa-at">M</span></h3>'+
    '<p id="pa-amine" class="pa-lead"></p><p>Comparamos tus medidas con las de la prenda. Es una orientación para elegir, no una garantía de calce. El Rancho Grande es ajustado en la cintura y cae suelto desde ahí; si estás entre dos talles, la guía de la ficha recomienda el más grande.</p>'+
    '<p id="pa-anote" class="pa-avail" hidden></p>'+
-   '<div class="pa-stack" id="pa-pickwrap"><button type="button" class="pa-btn" id="pa-pick">Elegir talle M y volver a la ficha</button><p class="pa-free-note">Vas a ver el talle marcado en la ficha. Si querés, podés cambiarlo antes de agregar al carrito.</p></div>'+
+   '<div class="pa-stack" id="pa-pickwrap"><button type="button" class="pa-btn" id="pa-pick">Elegir talle M y agregar al carrito</button><p class="pa-free-note">Marcamos el talle en la ficha y agregamos 1 unidad con el botón de compra de la tienda. Podés revisarlo en el carrito antes de pagar.</p></div>'+
    '<div class="pa-compare"><h4>Así se compara con la tabla</h4><table class="pa-cmp" aria-label="Tus medidas comparadas con la tabla"><thead><tr><th scope="col">Medida</th><th scope="col">Tuya</th><th scope="col">Talle <span id="pa-at2">M</span></th></tr></thead><tbody><tr><td>Cintura</td><td id="pa-ac1"></td><td id="pa-ac2"></td></tr><tr><td>Cadera</td><td id="pa-ah1"></td><td id="pa-ah2"></td></tr></tbody></table></div>'+
    '<div class="pa-avail" id="pa-aavail"></div>'+
    '<div class="pa-links"><button type="button" class="pa-lnk" data-go="measure">Revisar mis medidas</button><button type="button" class="pa-lnk" data-go="wa" data-wa-mode="consulta">¿Dudas? Consultanos por WhatsApp</button></div>'+
@@ -208,7 +208,7 @@ function plantilla(){
   '</section>'+
   /* Resultado B · a medida */
   '<section data-step="resB" aria-labelledby="pa-h-b" hidden>'+
-   '<p class="pa-step-k">Paso 2 de 2</p><h3 id="pa-h-b" class="pa-res-big">¡Lo hacemos a tu medida!</h3>'+
+   '<p class="pa-step-k">Paso 2 de 2</p><h3 id="pa-h-b" class="pa-res-big">¡Lo hacemos a tu medida GRATIS!</h3>'+
    '<p class="pa-lead">Podemos confeccionar tu '+esc(P.modelo)+' especialmente para vos.</p>'+
    '<p class="pa-custom-free">¡La confección a medida es GRATIS! No tiene recargo: pagás únicamente la prenda. Hacemos cualquier medida y está lista en '+esc(CFG.plazoMedida)+'.</p>'+
    '<div class="pa-fig"><svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="30" fill="#E9DED4"/><path d="M20 48l28-28M44 20l8 8-28 28h-8v-8z" fill="none" stroke="#553A1D" stroke-width="2.5" stroke-linejoin="round"/><path d="M26 30l4 4M32 24l4 4" stroke="#CC7B3E" stroke-width="2.5"/></svg><p>Cada Rancho Grande se confecciona de forma artesanal en Buenos Aires. Te escribimos por WhatsApp para coordinar tus medidas.</p></div>'+
@@ -245,14 +245,15 @@ function plantilla(){
 }
 
 /* ===== Estado (se mantiene al cerrar y reabrir) ===== */
-var S={step:"welcome",hist:[],cin:"",cad:"",res:null,fit:"",consent:false,msgEdited:false,picked:null,waMode:"medida",origen:null};
+var S={step:"welcome",hist:[],cin:"",cad:"",res:null,fit:"",consent:false,msgEdited:false,picked:null,waMode:"medida",origen:null,adding:false};
 var ROOT=null,TOAST=null,lastTrigger=null,isOpen=false;
 var TITLES={welcome:"Probador Alazán",table:"Tabla de talles",measure:"Probador Alazán",resA:"Probador Alazán",resB:"Probador Alazán",resC:"Probador Alazán",wa:"Pedido a medida"};
 
 /* ===== Accesos ===== */
+var HINT_ACC='Probador Alazán<span class="pa-hint-x"> · Te ayudamos a elegir</span>';
 function accSuperior(){
   var div=d.createElement("div");div.className="pa-acc";div.setAttribute("data-pa-acc","superior");
-  div.innerHTML='<button type="button" class="pa-acc-a" data-pa-open="superior" aria-haspopup="dialog">'+ICON_RULER+'<span class="pa-u" data-albl>¿Cuál es mi talle?</span><span class="pa-hint" data-ahint>Probador Alazán</span>'+ICON_CHEV+'</button>';
+  div.innerHTML='<button type="button" class="pa-acc-a" data-pa-open="superior" aria-haspopup="dialog">'+ICON_RULER+'<span class="pa-u" data-albl>Encontrá tu talle</span><span class="pa-hint" data-ahint>'+HINT_ACC+'</span>'+ICON_CHEV+'</button>';
   return div;
 }
 function accInferior(){
@@ -276,7 +277,7 @@ function updateAccessLabels(){
     var h=el.parentNode.querySelector("[data-ahint]");
     if(S.res&&S.res.tipo==="A"){el.textContent="Tu talle sugerido: "+S.res.talle;h.textContent="Ver resultado";}
     else if(S.res){el.textContent="Volver al Probador Alazán";h.textContent="";}
-    else{el.textContent="¿Cuál es mi talle?";h.textContent="Probador Alazán";}
+    else{el.textContent="Encontrá tu talle";h.innerHTML=HINT_ACC;}
     h.hidden=!h.textContent;
   });
 }
@@ -343,7 +344,7 @@ function renderRes(){var r=S.res;if(!r)return;
       $$("[data-fit]",options).forEach(function(b){b.setAttribute("aria-pressed",String(b.getAttribute("data-fit")===S.fit));});}
     var f=fila(r.talle);
     $("#pa-amine").innerHTML="Ingresaste <b>cintura "+S.cin+" cm</b> y <b>cadera "+S.cad+" cm</b>.";
-    $("#pa-at").textContent=r.talle;$("#pa-at2").textContent=r.talle;$("#pa-pick").textContent="Elegir talle "+r.talle+" y volver a la ficha";
+    $("#pa-at").textContent=r.talle;$("#pa-at2").textContent=r.talle;$("#pa-pick").textContent="Elegir talle "+r.talle+" y agregar al carrito";
     $("#pa-ac1").textContent=S.cin+" cm";$("#pa-ac2").textContent=f.cin+" cm";$("#pa-ah1").textContent=S.cad+" cm";$("#pa-ah2").textContent=rng(f.cad);
     renderAvail(r.talle);
     var n=[];if(r.entreDos)n.push("Tu cintura corresponde al talle "+r.cin+" y tu cadera al "+r.cad+". Te sugerimos el más grande, como indica la guía de la ficha.");
@@ -364,22 +365,47 @@ function renderAvail(t){var el=$("#pa-aavail"),dd=DISPONIBILIDAD[t],c=P.color?" 
 
 /* ===== Elegir talle en la ficha real ===== */
 function elegirTalle(){
-  if(!S.res||S.res.tipo!=="A")return;
+  if(!S.res||S.res.tipo!=="A"||S.adding)return;
   calcularDisponibilidad();
   var t=S.res.talle,a=P.grupo.anchors[t],dd=DISPONIBILIDAD[t];
-  /* Nunca se marca una variante agotada o no comprable, aunque se fuerce el botón. */
+  /* Nunca se marca ni se agrega una variante agotada o no comprable, aunque se fuerce el botón. */
   if(!a||!dd||dd.estado==="agotado"){push("probador_select_size",{pa_talle:t,pa_ok:false,pa_motivo:"no_disponible"});renderRes();return;}
+  S.adding=true;var pk=$("#pa-pick");if(pk){pk.disabled=true;pk.setAttribute("aria-busy","true");}
   S.picked=t;close();
   var ok=false;
-  if(a){try{a.click();ok=true;}catch(e){}}
+  try{a.click();ok=true;}catch(e){}
   setTimeout(function(){
     var marcado=!!(a&&a.classList.contains("selected"));
     push("probador_select_size",{pa_talle:t,pa_ok:marcado,pa_calce:S.res&&S.res.altTalle?S.fit:""});
-    try{P.grupo.el.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}
-    toast(marcado?"Talle "+t+" seleccionado. Podés cambiarlo o agregarlo al carrito.":"Elegí el talle "+t+" en el selector de la ficha.");
-  },ok?60:0);
+    agregarNativo(t,marcado);
+  },ok?120:0);
 }
-function toast(t){TOAST.textContent=t;TOAST.classList.add("pa-show");clearTimeout(toast._t);toast._t=setTimeout(function(){TOAST.classList.remove("pa-show");},5000);}
+/* v0.1.4 · Agregado al carrito con el botón NATIVO de Tiendanube (un solo clic, una sola operación).
+   El módulo no envía add_to_cart: el evento ecommerce lo genera Tiendanube como con cualquier compra. */
+function liberarPick(){S.adding=false;var pk=$("#pa-pick");if(pk){pk.disabled=false;pk.removeAttribute("aria-busy");}}
+function cantCarrito(){var n=-1;d.querySelectorAll(".js-cart-widget-amount").forEach(function(e){var v=parseInt(e.textContent,10);if(!isNaN(v)&&v>n)n=v;});return n;}
+function botonNativo(){var b=P.form.querySelector(".js-addtocart");if(!b)return null;
+  var txt=(b.value||b.textContent||"");if(b.disabled||b.classList.contains("disabled")||b.classList.contains("nostock")||/sin stock/i.test(txt))return null;return b;}
+function agregarNativo(t,marcado){
+  var b=marcado?botonNativo():null;
+  if(!b){liberarPick();push("probador_cart_submit",{pa_talle:t,pa_ok:false,pa_motivo:marcado?"boton_no_disponible":"variante_no_marcada"});
+    try{P.grupo.el.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}
+    toast(marcado?"El talle "+t+" quedó marcado, pero no se pudo agregar desde acá. Usá el botón de compra de la ficha.":"Elegí el talle "+t+" en el selector de la ficha.");return;}
+  var q=P.form.querySelector('input[name="quantity"]');if(q&&q.value!=="1"){q.value="1";}
+  var antes=cantCarrito(),listo=false,t0=Date.now();
+  var fin=function(res){if(listo)return;listo=true;w.removeEventListener("pagehide",alSalir);clearInterval(iv);liberarPick();
+    push("probador_cart_submit",{pa_talle:t,pa_ok:res==="ok"||res==="navega",pa_motivo:res});
+    if(res==="ok")toast("Talle "+t+" agregado al carrito.",true);
+    else if(res!=="navega")toast("No pudimos confirmar que se haya agregado. Revisá el carrito o usá el botón de compra de la ficha.",true);};
+  var alSalir=function(){fin("navega");};
+  w.addEventListener("pagehide",alSalir);
+  var iv=setInterval(function(){var n=cantCarrito();if(antes>=0&&n>antes)fin("ok");else if(Date.now()-t0>10000)fin("sin_confirmacion");},300);
+  toast("Agregando talle "+t+" al carrito…");
+  try{b.click();}catch(e){fin("error");}
+}
+function toast(t,carrito){TOAST.textContent=t;
+  if(carrito){var sp=d.createElement("span");sp.className="pa-toast-a";var v=d.createElement("a");v.href="/comprar/";v.textContent="Ver carrito";var s2=d.createElement("button");s2.type="button";s2.textContent="Seguir comprando";s2.addEventListener("click",function(){TOAST.classList.remove("pa-show");});sp.appendChild(v);sp.appendChild(s2);TOAST.appendChild(sp);}
+  TOAST.classList.add("pa-show");clearTimeout(toast._t);toast._t=setTimeout(function(){TOAST.classList.remove("pa-show");},carrito?9000:5000);}
 
 /* ===== WhatsApp ===== */
 function waBase(){var p=P.modelo+(P.color?" "+P.color:"");return {base:"¡Hola! Estoy viendo el "+p+" y me gustaría pedirlo a medida. ¿Me ayudan con los próximos pasos? ¡Gracias!",consulta:"¡Hola! Estoy viendo el "+p+" y tengo una duda con el talle. ¿Me ayudan?"};}
