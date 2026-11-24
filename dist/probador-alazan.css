@@ -1,4 +1,4 @@
-/*! Probador Alazán · estilos del módulo · v0.1.2
+/*! Probador Alazán · estilos del módulo · v0.1.3
    Diseño: prototipo aprobado (opción C). Tokens tomados de espacioalazan.com (tema Río).
    Todo lleva el prefijo pa- para no chocar con el tema ni con Wigy. */
 .pa-root,.pa-acc{
@@ -121,3 +121,7 @@ html.pa-lock,html.pa-lock body{overflow:hidden!important}
 @media (prefers-reduced-motion:reduce){.pa-root *{scroll-behavior:auto!important;transition:none!important}}
 /* Celulares de 320 px: la tabla de dos talles (resultado C) entra sin desbordar */
 @media (max-width:359px){.pa-cmp th,.pa-cmp td{padding:8px 4px;white-space:normal;font-size:13px}.pa-cmp th{font-size:11px;letter-spacing:.2px}}
+
+/* v0.1.3 · C2: hasta que la clienta elige el calce, solo se ve la pregunta (más ajustado / más holgado) */
+[data-step="resA"].pa-fit-pend>:not(#pa-fit):not(.pa-step-k):not(.pa-links):not(.pa-sep):not(.pa-sec){display:none!important}
+[data-step="resA"].pa-fit-pend #pa-fit{border-color:#553A1D}
