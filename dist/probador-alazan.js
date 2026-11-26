@@ -1,4 +1,4 @@
-/*! Probador Alazán v0.1.5 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
+/*! Probador Alazán v0.1.6 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
 (function(w,d){"use strict";
 if(w.__PA_LOADED)return;w.__PA_LOADED=true;
 /* Motor del Probador Alazán · copia textual del prototipo aprobado (ver orig/engine_original.js).
@@ -41,7 +41,7 @@ function parse(v){v=String(v).trim().replace(",",".");if(v==="")return {e:"vacio
 return {evaluar:evaluar,siguienteMasHolgado:siguienteMasHolgado,parse:parse,fila:fila,idxTalle:idxTalle,FAMILIA:FAMILIA};
 }
 /* ===== Probador Alazán · interfaz e integración con la ficha de Tiendanube (tema Río) ===== */
-var VERSION="0.1.5";
+var VERSION="0.1.6";
 var DEFAULTS={
   enabled:true,
   calculo:true,                 /* false = solo guía (tabla + a medida por WhatsApp), sin cálculo de talle */
@@ -375,43 +375,86 @@ function elegirTalle(){
   /* v0.1.5 · primero se cierra el probador y se espera a que termine el history.back() del cierre;
      recién después se marca el talle y se usa el botón nativo. Así la navegación al carrito
      nunca compite con la vuelta atrás del historial (causa del loop en el segundo uso). */
+  /* v0.1.6 · 1) posible repetición: mismo producto y MISMO talle enviado hace menos de 2 minutos en esta pestaña.
+     El primer toque solo advierte (sin afirmar que esté en el carrito) y no envía; un segundo toque deliberado
+     (pasado 1,5 s) agrega igual. Otro talle o el botón de la ficha no se ven afectados. */
+  var vg=varianteEsperada(t),g=guardaLeer(vg);
+  if(g&&!(S.repArmado&&S.repArmado.vid===(vg&&vg.id)&&Date.now()-S.repArmado.ts>1500&&Date.now()-S.repArmado.ts<60000)){
+    S.repArmado={vid:vg&&vg.id,ts:Date.now()};liberarPick();
+    push("probador_cart_submit",{pa_talle:t,pa_ok:false,pa_motivo:"repeticion_advertida"});
+    toast("Hace un momento ya iniciaste el agregado del talle "+t+". Revisá tu carrito antes de agregarlo otra vez. Si querés sumar otra unidad, volvé a tocar el botón.",true);return;}
+  S.repArmado=null;
+  /* v0.1.6 · 2) el clic al botón nativo sale solo cuando el historial ya volvió (sin atajo de 800 ms) */
   cerrarYLuego(function(){
     var ok=false;
     try{a.click();ok=true;}catch(e){}
     setTimeout(function(){
-      var marcado=!!(a&&a.classList.contains("selected"));
-      push("probador_select_size",{pa_talle:t,pa_ok:marcado,pa_calce:S.res&&S.res.altTalle?S.fit:""});
-      agregarNativo(t,marcado);
+      /* v0.1.6 · 3) se verifica lo que el formulario va a enviar, no solo la clase del botón de talle */
+      var v=varianteEsperada(t),marcado=!!(a&&a.classList.contains("selected"))&&formularioEnvia(t,v);
+      push("probador_select_size",marcado?{pa_talle:t,pa_ok:true,pa_calce:S.res&&S.res.altTalle?S.fit:""}:{pa_talle:t,pa_ok:false,pa_motivo:"variante_no_sincronizada",pa_calce:S.res&&S.res.altTalle?S.fit:""});
+      agregarNativo(t,marcado,v);
     },ok?120:0);
+  },function(){
+    liberarPick();push("probador_select_size",{pa_talle:t,pa_ok:false,pa_motivo:"historial_no_confirmado"});
+    try{P.grupo.el.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}
+    toast("Elegí el talle "+t+" en la ficha y tocá «Agregar al carrito».");
   });
 }
-function cerrarYLuego(fn){
+function cerrarYLuego(fn,alFallar){
   var propio=false;try{propio=!!(history.state&&history.state.pa);}catch(e){}
   if(!isOpen||!propio){close();fn();return;}
-  var hecho=false,seguir=function(){if(hecho)return;hecho=true;w.removeEventListener("popstate",seguir);setTimeout(fn,30);};
-  w.addEventListener("popstate",seguir);close();setTimeout(seguir,800);
+  var hecho=false,t0=Date.now(),iv=null;
+  var volvio=function(){try{return !(history.state&&history.state.pa);}catch(e){return true;}};
+  var fin=function(okH){if(hecho)return;hecho=true;w.removeEventListener("popstate",onPop);clearInterval(iv);if(okH)setTimeout(fn,30);else if(alFallar)alFallar();};
+  var onPop=function(){if(volvio())fin(true);};
+  w.addEventListener("popstate",onPop);close();
+  iv=setInterval(function(){if(volvio())fin(true);else if(Date.now()-t0>2500)fin(false);},50);
 }
+/* v0.1.6 · variante que corresponde al talle elegido (y al resto de atributos marcados, p. ej. color) */
+function varianteEsperada(t){
+  var idx=P.grupo.idx,label=P.grupo.labels[t],sel={};
+  var gs=P.form.querySelectorAll(".js-product-variants-group");
+  for(var i=0;i<gs.length;i++){var vid=gs[i].getAttribute("data-variation-id");if(vid===idx)continue;var x=gs[i].querySelector("a.js-insta-variant.selected");if(x)sel[vid]=x.getAttribute("data-option");}
+  for(var j=0;j<P.variants.length;j++){var v=P.variants[j];if(v["option"+idx]!==label)continue;
+    var ok=true;for(var o in sel){if(v["option"+o]!==undefined&&v["option"+o]!==sel[o])ok=false;}if(ok)return v;}
+  return null;
+}
+/* v0.1.6 · el <select> del talle y el variant_id del formulario coinciden con la variante esperada */
+function formularioEnvia(t,v){
+  try{var label=P.grupo.labels[t],idx=P.grupo.idx;
+    var s=P.form.querySelector('select[name="variation['+idx+']"]')||P.grupo.el.querySelector("select");
+    if(s&&s.value!==label)return false;
+    var h=P.form.querySelectorAll('input[name="variant_id"]');
+    if(v&&h.length){for(var i=0;i<h.length;i++){if(String(h[i].value)!==String(v.id))return false;}}
+    return !!s||!!h.length;
+  }catch(e){return false;}
+}
+/* v0.1.6 · registro del último envío desde el probador (producto + variante, 2 minutos, solo en esta pestaña) */
+function guardaLeer(v){try{var g=JSON.parse(w.sessionStorage.getItem("pa_add_guard")||"null");if(g&&g.pid===P.id&&v&&g.vid===v.id&&Date.now()-g.ts<120000)return g;}catch(e){}return null;}
+function guardaPoner(v){try{w.sessionStorage.setItem("pa_add_guard",JSON.stringify({pid:P.id,vid:v?v.id:null,ts:Date.now()}));}catch(e){}}
 /* v0.1.4 · Agregado al carrito con el botón NATIVO de Tiendanube (un solo clic, una sola operación).
    El módulo no envía add_to_cart: el evento ecommerce lo genera Tiendanube como con cualquier compra. */
 function liberarPick(){S.adding=false;var pk=$("#pa-pick");if(pk){pk.disabled=false;pk.removeAttribute("aria-busy");}}
 function cantCarrito(){var n=-1;d.querySelectorAll(".js-cart-widget-amount").forEach(function(e){var v=parseInt(e.textContent,10);if(!isNaN(v)&&v>n)n=v;});return n;}
 function botonNativo(){var b=P.form.querySelector(".js-addtocart");if(!b)return null;
   var txt=(b.value||b.textContent||"");if(b.disabled||b.classList.contains("disabled")||b.classList.contains("nostock")||/sin stock/i.test(txt))return null;return b;}
-function agregarNativo(t,marcado){
+function agregarNativo(t,marcado,v){
   var b=marcado?botonNativo():null;
-  if(!b){liberarPick();push("probador_cart_submit",{pa_talle:t,pa_ok:false,pa_motivo:marcado?"boton_no_disponible":"variante_no_marcada"});
+  if(!b){liberarPick();push("probador_cart_submit",{pa_talle:t,pa_ok:false,pa_motivo:marcado?"boton_no_disponible":"variante_no_sincronizada"});
     try{P.grupo.el.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}
     toast(marcado?"El talle "+t+" quedó marcado, pero no se pudo agregar desde acá. Usá el botón de compra de la ficha.":"Elegí el talle "+t+" en el selector de la ficha.");return;}
   var q=P.form.querySelector('input[name="quantity"]');if(q&&q.value!=="1"){q.value="1";}
   var antes=cantCarrito(),listo=false,t0=Date.now();
   var fin=function(res){if(listo)return;listo=true;w.removeEventListener("pagehide",alSalir);clearInterval(iv);liberarPick();
-    push("probador_cart_submit",{pa_talle:t,pa_ok:res==="ok"||res==="navega",pa_motivo:res});
+    /* v0.1.6 · solo "ok" (contador del carrito subió en la misma página) es éxito; "navega" ya no se da por bueno */
+    push("probador_cart_submit",{pa_talle:t,pa_ok:res==="ok",pa_motivo:res==="navega"?"navega_sin_confirmar":res});
     if(res==="ok")toast("Talle "+t+" agregado al carrito.",true);
     else if(res!=="navega")toast("No pudimos confirmar que se haya agregado. Revisá el carrito o usá el botón de compra de la ficha.",true);};
   var alSalir=function(){fin("navega");};
   w.addEventListener("pagehide",alSalir);
   var iv=setInterval(function(){var n=cantCarrito();if(antes>=0&&n>antes)fin("ok");else if(Date.now()-t0>10000)fin("sin_confirmacion");},300);
   toast("Agregando talle "+t+" al carrito…");
+  guardaPoner(v);
   try{b.click();}catch(e){fin("error");}
 }
 function toast(t,carrito){TOAST.textContent=t;
