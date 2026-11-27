@@ -1,4 +1,4 @@
-/*! Probador Alazán v0.1.6 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
+/*! Probador Alazán v0.1.7 · Espacio Alazán · módulo independiente para fichas Rancho Grande (Tiendanube, tema Río) */
 (function(w,d){"use strict";
 if(w.__PA_LOADED)return;w.__PA_LOADED=true;
 /* Motor del Probador Alazán · copia textual del prototipo aprobado (ver orig/engine_original.js).
@@ -41,7 +41,7 @@ function parse(v){v=String(v).trim().replace(",",".");if(v==="")return {e:"vacio
 return {evaluar:evaluar,siguienteMasHolgado:siguienteMasHolgado,parse:parse,fila:fila,idxTalle:idxTalle,FAMILIA:FAMILIA};
 }
 /* ===== Probador Alazán · interfaz e integración con la ficha de Tiendanube (tema Río) ===== */
-var VERSION="0.1.6";
+var VERSION="0.1.7";
 var DEFAULTS={
   enabled:true,
   calculo:true,                 /* false = solo guía (tabla + a medida por WhatsApp), sin cálculo de talle */
@@ -444,11 +444,13 @@ function agregarNativo(t,marcado,v){
     try{P.grupo.el.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}
     toast(marcado?"El talle "+t+" quedó marcado, pero no se pudo agregar desde acá. Usá el botón de compra de la ficha.":"Elegí el talle "+t+" en el selector de la ficha.");return;}
   var q=P.form.querySelector('input[name="quantity"]');if(q&&q.value!=="1"){q.value="1";}
-  var antes=cantCarrito(),listo=false,t0=Date.now();
+  var antes=cantCarrito(),listo=false,t0=Date.now(),nativoAntes=avisoNativoVisible();
   var fin=function(res){if(listo)return;listo=true;w.removeEventListener("pagehide",alSalir);clearInterval(iv);liberarPick();
     /* v0.1.6 · solo "ok" (contador del carrito subió en la misma página) es éxito; "navega" ya no se da por bueno */
     push("probador_cart_submit",{pa_talle:t,pa_ok:res==="ok",pa_motivo:res==="navega"?"navega_sin_confirmar":res});
-    if(res==="ok")toast("Talle "+t+" agregado al carrito.",true);
+    /* v0.1.7 · con el carrito rápido del tema, Tiendanube ya muestra su aviso de agregado: el probador no repite el éxito.
+       Si el aviso nativo no aparece (o ya estaba visible antes del clic), se mantiene el aviso propio. */
+    if(res==="ok")exitoSinDuplicar(t,nativoAntes);
     else if(res!=="navega")toast("No pudimos confirmar que se haya agregado. Revisá el carrito o usá el botón de compra de la ficha.",true);};
   var alSalir=function(){fin("navega");};
   w.addEventListener("pagehide",alSalir);
@@ -456,6 +458,20 @@ function agregarNativo(t,marcado,v){
   toast("Agregando talle "+t+" al carrito…");
   guardaPoner(v);
   try{b.click();}catch(e){fin("error");}
+}
+/* v0.1.7 · aviso nativo de agregado del tema (notificación flotante, hoja/modal de notificación o panel del carrito abierto) */
+function visibleNativo(e){try{if(!e)return false;var cs=w.getComputedStyle(e),r=e.getBoundingClientRect();return cs.display!=="none"&&cs.visibility!=="hidden"&&r.width>0&&r.height>0;}catch(x){return false;}}
+function avisoNativoVisible(){try{
+  var f=d.querySelectorAll(".js-alert-added-to-cart");for(var i=0;i<f.length;i++){if(!f[i].classList.contains("notification-hidden")&&visibleNativo(f[i]))return true;}
+  var it=d.querySelectorAll(".js-cart-notification-item");for(var j=0;j<it.length;j++){if(visibleNativo(it[j]))return true;}
+  var pn=d.querySelectorAll(".js-ajax-cart-panel");for(var k=0;k<pn.length;k++){if(visibleNativo(pn[k]))return true;}
+}catch(e){}return false;}
+function exitoSinDuplicar(t,nativoAntes){
+  if(nativoAntes){toast("Talle "+t+" agregado al carrito.",true);return;}
+  var t1=Date.now(),iv2=setInterval(function(){
+    if(avisoNativoVisible()){clearInterval(iv2);clearTimeout(toast._t);TOAST.classList.remove("pa-show");}
+    else if(Date.now()-t1>1500){clearInterval(iv2);toast("Talle "+t+" agregado al carrito.",true);}
+  },100);
 }
 function toast(t,carrito){TOAST.textContent=t;
   if(carrito){var sp=d.createElement("span");sp.className="pa-toast-a";var v=d.createElement("a");v.href="/comprar/";v.textContent="Ver carrito";var s2=d.createElement("button");s2.type="button";s2.textContent="Seguir comprando";s2.addEventListener("click",function(){TOAST.classList.remove("pa-show");});sp.appendChild(v);sp.appendChild(s2);TOAST.appendChild(sp);}
